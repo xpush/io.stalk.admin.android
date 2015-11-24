@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Base64;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
@@ -19,16 +20,21 @@ import com.android.volley.toolbox.Volley;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+import io.stalk.android.R;
 import io.xpush.chat.core.CallbackEvent;
 import io.xpush.chat.core.XPushCore;
 import io.xpush.chat.network.StringRequest;
-import io.stalk.android.R;
 
 public class LoginActivity extends AppCompatActivity  {
     private static final String TAG = LoginActivity.class.getSimpleName();
@@ -74,8 +80,6 @@ public class LoginActivity extends AppCompatActivity  {
         progressDialog.show();
 
         final Map<String,String> params = new HashMap<String, String>();
-
-
         String url = getString(R.string.stalk_front_url);
 
         final String id = mIdText.getText().toString();
@@ -92,8 +96,13 @@ public class LoginActivity extends AppCompatActivity  {
                     public void onResponse(JSONObject response) {
                         try {
                             Log.d(TAG, response.toString());
+
                             if( "ok".equalsIgnoreCase(response.getString("status")) ){
-                                XPushCore.getInstance().login(id, id, new CallbackEvent() {
+
+                                String uid = response.getJSONObject( "result" ).getString("uid");
+                                String pw = hmacSHA256encode(uid, "sha256");
+
+                                XPushCore.getInstance().login(uid, pw, new CallbackEvent() {
                                     @Override
                                     public void call(Object... args) {
                                         if (args == null || args.length == 0) {
@@ -114,6 +123,7 @@ public class LoginActivity extends AppCompatActivity  {
                                 }
 
                                 progressDialog.dismiss();
+                                onLoginFailed();
                             }
                         } catch (JSONException e) {
                             e.printStackTrace();
@@ -126,6 +136,7 @@ public class LoginActivity extends AppCompatActivity  {
                         Log.d(TAG, "Login error ======================");
                         error.printStackTrace();
                         progressDialog.dismiss();
+                        onLoginFailed();
                     }
                 }
         );
@@ -192,5 +203,24 @@ public class LoginActivity extends AppCompatActivity  {
         }
 
         return valid;
+    }
+
+    private String hmacSHA256encode(String data, String key) {
+        String result = null;
+
+        try {
+            Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secret_key = null;
+            secret_key = new SecretKeySpec(key.getBytes(), "HmacSHA256");
+            sha256_HMAC.init(secret_key);
+            result = Base64.encodeToString(sha256_HMAC.doFinal(data.getBytes()), 0);
+
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException ie) {
+            ie.printStackTrace();
+        }
+
+        return result;
     }
 }

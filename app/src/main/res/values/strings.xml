@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">stalk</string>
-    <string name="content_provider_authority">io.stalk.android.persist.xpushcontentprovider</string>
+    <string name="content_provider_authority">io.stalk.admin.android.persist.xpushcontentprovider</string>
 
     <string name="host_name">http://54.178.160.166:8000</string>
-    <string name="stalk_front_url">http://54.65.235.3:9000</string>
+    <string name="stalk_front_url">http://admin.stalk.io:9000</string>
     <string name="app_id">stalk</string>
     <string name="device_id">android</string>
     <string name="gcm_defaultSenderId">944977353393</string>
