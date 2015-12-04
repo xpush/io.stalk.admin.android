@@ -5,7 +5,7 @@
 
     <string name="host_name">http://54.178.160.166:8000</string>
     <string name="stalk_front_url">http://admin.stalk.io:9000</string>
-    <string name="app_id">stalk</string>
+    <string name="app_id">STALK</string>
     <string name="device_id">android</string>
     <string name="gcm_defaultSenderId">944977353393</string>
 

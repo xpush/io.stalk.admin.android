@@ -10,110 +10,105 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.EditText;
+import android.widget.TextView;
 
-import com.android.volley.RequestQueue;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.toolbox.Volley;
 import com.facebook.drawee.view.SimpleDraweeView;
-import com.squareup.okhttp.MediaType;
-import com.squareup.okhttp.MultipartBuilder;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.RequestBody;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
+import butterknife.Bind;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
+import io.xpush.chat.common.Constants;
+import io.xpush.chat.core.CallbackEvent;
 import io.xpush.chat.core.XPushCore;
 import io.xpush.chat.models.XPushSession;
-import io.xpush.chat.network.StringRequest;
-import io.xpush.chat.util.RealPathUtil;
 import io.stalk.android.R;
+import io.stalk.android.activities.EditNickNameActivity;
+import io.stalk.android.activities.EditStatusMessageActivity;
 
 public class ProfileFragment extends Fragment {
 
     private String TAG = ProfileFragment.class.getSimpleName();
     private Context mActivity;
 
-    private View mImageBox;
-    private SimpleDraweeView mThumbnail;
     private XPushSession mSession;
-
-    private EditText mUserName;
-    private EditText mStatusMessage;
-    private EditText mEmail;
-
     private JSONObject mJsonUserData;
 
-    private Button mSaveButton;
+    @Bind(R.id.nickname_button)
+    View mNicknameButton;
+
+    @Bind(R.id.status_message_button)
+    View mStatusMessageButton;
+
+    @Bind(R.id.tvUserId)
+    TextView mTvUserId;
+
+    @Bind(R.id.imageBox)
+    View mImageBox;
+
+    @Bind(R.id.thumbnail)
+    SimpleDraweeView mThumbnail;
+
+    @Bind(R.id.nickname)
+    TextView mTvNickname;
+
+    @Bind(R.id.status_message)
+    TextView mTvStatusMessage;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         mActivity = getActivity();
         mSession = XPushCore.getInstance().getXpushSession();
+
+        Log.d(TAG, mSession.toString());
         mJsonUserData = mSession.getUserData();
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_profile, container, false);
+        ButterKnife.bind(this, view);
 
-        mImageBox = view.findViewById(R.id.imageBox);
-        mImageBox.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                openGallery(110);
-            }
-        });
-
-        mThumbnail = (SimpleDraweeView) view.findViewById(R.id.thumbnail);
         if( mSession.getImage() != null ) {
             mThumbnail.setImageURI(Uri.parse(mSession.getImage()));
         }
 
-        mUserName = (EditText) view.findViewById(R.id.userName);
         if( null != mSession.getName() ) {
-            mUserName.setText(mSession.getName());
+            mTvNickname.setText(mSession.getName());
         }
 
-        mStatusMessage = (EditText) view.findViewById(R.id.statusMessage);
-        if( null != mSession.getName() ) {
-            mStatusMessage.setText(mSession.getMessage());
+        if( null != mSession.getMessage() ) {
+            mTvStatusMessage.setText(mSession.getMessage());
         }
 
-        mEmail = (EditText) view.findViewById(R.id.email);
-        if( null != mSession.getEmail() ) {
-            mEmail.setText(mSession.getEmail());
+        if( null != mSession.getId() ){
+            mTvUserId.setText( mSession.getEmail() );
         }
-
-        mSaveButton = (Button) view.findViewById(R.id.btn_save);
-
-        mSaveButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                updateProfile(mJsonUserData);
-            }
-        });
 
         return view;
     }
 
-    public void openGallery(int req_code){
+    @OnClick(R.id.nickname_button)
+    public void editNickName() {
+        Intent localIntent = new Intent(mActivity, EditNickNameActivity.class);
+        getActivity().startActivityForResult(localIntent, Constants.REQUEST_EDIT_NICKNAME);
+    }
+
+    @OnClick(R.id.status_message_button)
+    public void editStatusMessage() {
+        Intent localIntent = new Intent(mActivity, EditStatusMessageActivity.class);
+        getActivity().startActivityForResult(localIntent, Constants.REQUEST_EDIT_STATUS_MESSAGE);
+    }
+
+    @OnClick(R.id.imageBox)
+    public void openGallery(){
         Intent intent = new Intent();
         intent.setType("image/*");
         intent.setAction(Intent.ACTION_GET_CONTENT);
-        getActivity().startActivityForResult(Intent.createChooser(intent, "Select file to use profile"), req_code);
+        getActivity().startActivityForResult(Intent.createChooser(intent, "Select file to use profile"), Constants.REQUEST_EDIT_IMAGE);
     }
 
     public void setImage(Uri uri){
@@ -121,153 +116,68 @@ public class ProfileFragment extends Fragment {
         imageUpload.execute();
     }
 
-    private static final MediaType MEDIA_TYPE_PNG = MediaType.parse("image/png");
-
-    public String uploadImage(Uri uri){
-
-        String downloadUrl = null;
-        String url = mSession.getServerUrl()+"/upload";
-        JSONObject userData = new JSONObject();
-
+    public void setNickName(String name){
         try {
-            userData.put( "U", mSession.getId() );
-            userData.put( "D", mSession.getDeviceId() );
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        String realPath = RealPathUtil.getRealPath(mActivity, uri);
-
-        File aFile = new File(realPath);
-
-        RequestBody requestBody = new MultipartBuilder()
-                .type(MultipartBuilder.FORM)
-                .addFormDataPart("file", aFile.getName(), RequestBody.create(MEDIA_TYPE_PNG, aFile)).build();
-
-
-        String appId = XPushCore.getInstance().getAppId();
-
-        Request request = new Request.Builder()
-                .url(url)
-                .addHeader("XP-A", appId )
-                .addHeader("XP-C", mSession.getId() +"^"+ appId)
-                .addHeader("XP-U", userData.toString() )
-                .addHeader("XP-FU-org",  aFile.getName())
-                .addHeader("XP-FU-nm", aFile.getName().substring(0, aFile.getName().lastIndexOf(".") ) )
-                .addHeader("XP-FU-tp", "image")
-                .post(requestBody)
-                .build();
-
-        OkHttpClient client = new OkHttpClient();
-
-        com.squareup.okhttp.Response response = null;
-        try {
-            response = client.newCall(request).execute();
-            if (!response.isSuccessful()) {
-                throw new IOException("Unexpected code " + response);
+            if (mJsonUserData != null) {
+                mJsonUserData.put("NM", name);
+                updateProfile();
             }
-
-            JSONObject res = new JSONObject( response.body().string() );
-            JSONObject result = res.getJSONObject("result");
-
-            String channel = result.getString("channel");
-            String tname = result.getString("tname");
-
-            downloadUrl = mSession.getServerUrl() + "/download/" + appId + "/" + channel + "/" + mSession.getId() + "/"+tname;
-            mJsonUserData.put("I", downloadUrl);
-
-        } catch (IOException e) {
-            e.printStackTrace();
         } catch (JSONException e) {
             e.printStackTrace();
         }
-
-        return downloadUrl;
     }
 
-    private void updateProfile(final JSONObject jsonData){
-
+    public void setStatusMessage(String message){
         try {
-            if( jsonData != null ) {
-                jsonData.put("NM", mUserName.getText());
-                jsonData.put("MG", mStatusMessage.getText());
-                jsonData.put("EM", mEmail.getText());
+            if( mJsonUserData != null ) {
+                mJsonUserData.put("MG", message);
+                updateProfile();
             }
         } catch (JSONException e) {
             e.printStackTrace();
         }
+    }
 
-        final Map<String,String> params = new HashMap<String, String>();
-
-        params.put("A", getString(R.string.app_id));
-        params.put("U", mSession.getId());
-        params.put("DT", jsonData.toString());
-        params.put("PW", mSession.getPassword());
-        params.put("D", mSession.getDeviceId());
-
-        String url = getString(R.string.host_name)+"/user/update";
-
-        StringRequest request = new StringRequest(url, params,
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-                        Log.d(TAG, "Update user success ======================");
-                        Log.d(TAG, response.toString());
-                        try {
-                            if( "ok".equalsIgnoreCase(response.getString("status")) ){
-                                Log.d(TAG, response.getString("status"));
-
-                                if( jsonData.has("I") ) {
-                                    mSession.setImage(jsonData.getString("I"));
-                                }
-                                if( jsonData.has("NM") ) {
-                                    mSession.setName(jsonData.getString("NM"));
-                                }
-
-                                if( jsonData.has("MG") ) {
-                                    mSession.setMessage(jsonData.getString("MG"));
-                                }
-
-                                if( jsonData.has("EM") ) {
-                                    mSession.setEmail(jsonData.getString("EM"));
-                                }
-                                XPushCore.getInstance().setXpushSession( mSession );
-                            }
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
+    private void updateProfile(){
+        XPushCore.getInstance().updateUser(mJsonUserData, new CallbackEvent() {
+            @Override
+            public void call(Object... args) {
+                try {
+                    if( args.length > 0 ) {
+                        JSONObject result = (JSONObject) args[0];
+                        mThumbnail.setImageURI(Uri.parse(result.getString("I")));
                     }
-                },
-                new Response.ErrorListener() {
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
-                        Log.d(TAG, "Update user error ======================");
-                        error.printStackTrace();
-                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
                 }
-        );
-
-        RequestQueue queue = Volley.newRequestQueue(mActivity);
-        queue.add(request);
+            }
+        });
     }
 
     private class UploadImageTask extends AsyncTask<Void, Void, String> {
         Uri mUri;
 
-        public UploadImageTask( Uri uri ){
+        public UploadImageTask(Uri uri) {
             this.mUri = uri;
         }
 
         @Override
         protected String doInBackground(Void... voids) {
-            String uploadImageUrl = uploadImage(mUri);
-            return uploadImageUrl;
+            String downloadUrl = XPushCore.getInstance().uploadImage(mUri);
+            try {
+                mJsonUserData.put("I", downloadUrl);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            return downloadUrl;
         }
 
         @Override
         protected  void onPostExecute(final String imageUrl){
-            mThumbnail.setImageURI(Uri.parse(imageUrl));
             super.onPostExecute(imageUrl);
+            if( imageUrl != null ){
+                updateProfile();
+            }
         }
     }
 }

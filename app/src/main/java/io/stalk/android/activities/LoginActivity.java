@@ -46,6 +46,8 @@ public class LoginActivity extends AppCompatActivity  {
     @Bind(R.id.input_password)
     EditText mPasswordText;
 
+    ProgressDialog progressDialog;
+
     @OnClick(R.id.link_signup)
     public void signUp() {
         Intent intent = new Intent(getApplicationContext(), SignupActivity.class);
@@ -74,7 +76,7 @@ public class LoginActivity extends AppCompatActivity  {
 
         mLoginButton.setEnabled(false);
 
-        final ProgressDialog progressDialog = new ProgressDialog(LoginActivity.this);
+        progressDialog = new ProgressDialog(LoginActivity.this);
         progressDialog.setIndeterminate(true);
         progressDialog.setMessage("Authenticating...");
         progressDialog.show();
@@ -99,18 +101,28 @@ public class LoginActivity extends AppCompatActivity  {
 
                             if( "ok".equalsIgnoreCase(response.getString("status")) ){
 
-                                String uid = response.getJSONObject( "result" ).getString("uid");
-                                String pw = hmacSHA256encode(uid, "sha256");
+                                final String uid = response.getJSONObject( "result" ).getString("uid");
+                                final String image = response.getJSONObject( "result" ).getString("image");
+                                final String name = response.getJSONObject( "result" ).getString("name");
+                                final String email = response.getJSONObject( "result" ).getString("email");
+
+                                final String pw = hmacSHA256encode(uid, "sha256");
 
                                 XPushCore.getInstance().login(uid, pw, new CallbackEvent() {
                                     @Override
                                     public void call(Object... args) {
                                         if (args == null || args.length == 0) {
                                             progressDialog.dismiss();
-                                            onLoginSuccess();
+                                            onLoginSuccess(image,name,email);
                                         } else {
-                                            progressDialog.dismiss();
-                                            onLoginFailed();
+
+                                            if( "NOT-EXIST-DEVICE".equals( (String)args[0] ) ) {
+                                                addDeivce( uid, pw, image, name, email );
+                                            } else {
+                                                progressDialog.dismiss();
+                                                onLoginFailed();
+                                            }
+                                            
                                         }
                                     }
                                 });
@@ -161,17 +173,26 @@ public class LoginActivity extends AppCompatActivity  {
         moveTaskToBack(true);
     }
 
-    public void onLoginSuccess() {
-        mLoginButton.setEnabled(true);
+    public void onLoginSuccess(String image, String name, String email) {
 
-        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
+        if( image != null || name != null || email != null ) {
+            if (image != null) {
+                XPushCore.getInstance().getXpushSession().setImage(image);
+            }
 
-        Intent intent = null;
-        if( pref.getBoolean("SITE_READY", false) ) {
-            intent = new Intent(LoginActivity.this, MainActivity.class);
-        } else {
-            intent = new Intent(LoginActivity.this, UnreadyActivity.class);
+            if (name != null) {
+                XPushCore.getInstance().getXpushSession().setName(name);
+            }
+
+            if (email != null) {
+                XPushCore.getInstance().getXpushSession().setEmail(email);
+            }
+
+            XPushCore.getInstance().setXpushSession(XPushCore.getInstance().getXpushSession());
         }
+
+        mLoginButton.setEnabled(true);
+        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
         startActivity(intent);
         finish();
     }
@@ -214,6 +235,9 @@ public class LoginActivity extends AppCompatActivity  {
             secret_key = new SecretKeySpec(key.getBytes(), "HmacSHA256");
             sha256_HMAC.init(secret_key);
             result = Base64.encodeToString(sha256_HMAC.doFinal(data.getBytes()), 0);
+            result = result.replace("\n", "");
+
+            Log.d(TAG, result);
 
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -222,5 +246,30 @@ public class LoginActivity extends AppCompatActivity  {
         }
 
         return result;
+    }
+
+    private void addDeivce(final String uid, final String pw, final String image, final String name, final String email){
+        XPushCore.getInstance().addDevice(uid, pw, new CallbackEvent() {
+            @Override
+            public void call(Object... args) {
+                if (args == null || args.length == 0) {
+                    XPushCore.getInstance().login(uid, pw, new CallbackEvent() {
+                        @Override
+                        public void call(Object... args) {
+                            if (args == null || args.length == 0) {
+                                progressDialog.dismiss();
+                                onLoginSuccess(image, name, email);
+                            } else {
+                                progressDialog.dismiss();
+                                onLoginFailed();
+                            }
+                        }
+                    });
+                } else {
+                    progressDialog.dismiss();
+                    onLoginFailed();
+                }
+            }
+        });
     }
 }
