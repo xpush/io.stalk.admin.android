@@ -1,5 +1,6 @@
 package io.stalk.android.fragments;
 
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -12,10 +13,17 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.Volley;
 import com.facebook.drawee.view.SimpleDraweeView;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
@@ -27,6 +35,7 @@ import io.xpush.chat.models.XPushSession;
 import io.stalk.android.R;
 import io.stalk.android.activities.EditNickNameActivity;
 import io.stalk.android.activities.EditStatusMessageActivity;
+import io.xpush.chat.network.StringRequest;
 
 public class ProfileFragment extends Fragment {
 
@@ -138,20 +147,51 @@ public class ProfileFragment extends Fragment {
         }
     }
 
-    private void updateProfile(){
-        XPushCore.getInstance().updateUser(mJsonUserData, new CallbackEvent() {
-            @Override
-            public void call(Object... args) {
-                try {
-                    if( args.length > 0 ) {
-                        JSONObject result = (JSONObject) args[0];
-                        mThumbnail.setImageURI(Uri.parse(result.getString("I")));
+    public void updateProfile() {
+        Log.d(TAG, "Login");
+
+        final Map<String,String> params = new HashMap<String, String>();
+        String url = getString(R.string.stalk_front_url);
+
+        try {
+            params.put("image", mJsonUserData.getString("I"));
+            params.put("name", mJsonUserData.getString("NM"));
+        } catch ( Exception e ){
+            e.printStackTrace();
+        }
+
+        url = url + "/api/auths/"+mSession.getId();
+
+        StringRequest request = new StringRequest(url, params,
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        try {
+                            Log.d(TAG, response.toString());
+                            if( response.has("uid") && mSession.getId().equalsIgnoreCase(response.getString("uid")) ){
+                                XPushCore.getInstance().getXpushSession().setImage( params.get("image") );
+                                XPushCore.getInstance().getXpushSession().setName( params.get("name") );
+                                XPushCore.getInstance().setXpushSession(XPushCore.getInstance().getXpushSession());
+
+                            } else {
+                                Log.d(TAG, "update error ======================");
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
                     }
-                } catch (JSONException e) {
-                    e.printStackTrace();
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Log.d(TAG, "update error ======================");
+                        error.printStackTrace();
+                    }
                 }
-            }
-        });
+        );
+
+        RequestQueue queue = Volley.newRequestQueue(mActivity);
+        queue.add(request);
     }
 
     private class UploadImageTask extends AsyncTask<Void, Void, String> {
