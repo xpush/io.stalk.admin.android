@@ -12,6 +12,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
@@ -129,9 +130,7 @@ public class LoginActivity extends AppCompatActivity  {
                             } else {
                                 Log.d(TAG, "Login error ======================");
                                 if( response.has("message") ){
-
-                                } else {
-
+                                    Log.d(TAG, response.getString("message") );
                                 }
 
                                 progressDialog.dismiss();
@@ -154,7 +153,12 @@ public class LoginActivity extends AppCompatActivity  {
         );
 
         RequestQueue queue = Volley.newRequestQueue(getBaseContext());
+        request.setRetryPolicy(new DefaultRetryPolicy(
+                5000,
+                DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
+                DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
         queue.add(request);
+
     }
 
 

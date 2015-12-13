@@ -30,7 +30,7 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile 'io.xpush:lib-xpush-android:0.0.2'
+    compile 'io.xpush:lib-xpush-android:0.0.3'
     compile 'com.google.guava:guava:18.0'
     compile 'com.jakewharton:butterknife:7.0.1'
 }
